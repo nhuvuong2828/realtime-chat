@@ -22,10 +22,22 @@ export const getMessages = async (req, res) => {
 
 export const searchUsers = async (req, res) => {
   try {
-    const { query } = req.query;
-    const users = await User.find({ username: { $regex: query, $options: "i" }, _id: { $ne: req.user._id } }).select("_id username");
+    const keyword = req.query.query
+      ? {
+          username: { $regex: req.query.query, $options: "i" }, // Tìm theo tên, không phân biệt hoa thường
+        }
+      : {};
+
+    // 💡 SỬA Ở ĐÂY: Thêm .select() để yêu cầu Database nhả cả avatar, displayName và bio ra
+    const users = await User.find(keyword)
+      .find({ _id: { $ne: req.user._id } }) // Không tìm thấy chính mình
+      .select("_id username avatar displayName bio"); 
+
     res.status(200).json(users);
-  } catch (error) { res.status(500).json({ message: "Lỗi tìm kiếm" }); }
+  } catch (error) {
+    console.error("Lỗi tìm kiếm:", error);
+    res.status(500).json({ message: "Lỗi khi tìm kiếm người dùng" });
+  }
 };
 
 export const sendFriendRequest = async (req, res) => {
@@ -142,4 +154,31 @@ export const unblockUser = async (req, res) => {
     await User.findByIdAndUpdate(req.user._id, { $pull: { blockedUsers: targetId } });
     res.status(200).json({ message: "Đã bỏ chặn" });
   } catch (error) { res.status(500).json({ message: "Lỗi bỏ chặn" }); }
+};
+
+export const getConversations = async (req, res) => {
+  try {
+    const myUsername = req.user.username;
+    
+    // 1. Quét toàn bộ DB xem mình từng nhắn tin/nhận tin của những phòng nào
+    const messages = await Message.find({ roomId: { $regex: myUsername } });
+
+    // 2. Nhặt ra danh sách tên những người đã từng chat
+    const chattedUsernames = new Set();
+    messages.forEach(msg => {
+      const users = msg.roomId.split("_");
+      users.forEach(u => {
+        if (u !== myUsername) chattedUsernames.add(u);
+      });
+    });
+
+    // 3. Lấy thông tin Avatar, Tên của những người đó trả về cho Frontend
+    const conversations = await User.find({ username: { $in: Array.from(chattedUsernames) } })
+      .select("_id username avatar displayName bio nicknames");
+
+    res.status(200).json(conversations);
+  } catch (error) {
+    console.error("Lỗi lấy danh sách chat:", error);
+    res.status(500).json({ message: "Lỗi lấy danh sách cuộc trò chuyện" });
+  }
 };

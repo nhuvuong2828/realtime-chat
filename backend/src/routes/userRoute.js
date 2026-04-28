@@ -3,8 +3,10 @@ import {
   authMe, getAllUsers, getMessages, searchUsers,
   sendFriendRequest, acceptFriendRequest, getFriendRequests, getFriends,
   removeFriend, setNickname, blockUser,
-  updateProfile, getBlockedUsers, unblockUser
+  updateProfile, getBlockedUsers, unblockUser,getConversations
 } from "../controllers/userController.js"; 
+import { protectedRoute } from "../middlewares/authMiddleware.js";
+import { createGroup, getMyGroups } from "../controllers/groupController.js";
 
 const router = express.Router();
 
@@ -22,5 +24,9 @@ router.post("/block-user", blockUser);
 router.post("/profile", updateProfile);
 router.get("/blocked", getBlockedUsers);
 router.post("/unblock", unblockUser);
+router.get("/conversations", protectedRoute, getConversations);
+
+router.post("/groups", protectedRoute, createGroup);
+router.get("/groups", protectedRoute, getMyGroups);
 
 export default router;
